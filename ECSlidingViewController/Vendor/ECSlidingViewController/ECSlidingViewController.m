@@ -7,6 +7,7 @@
 //
 
 #import "ECSlidingViewController.h"
+#import "GOKeyboardUtility.h"
 
 NSString *const ECSlidingViewUnderRightWillAppear = @"ECSlidingViewUnderRightWillAppear";
 NSString *const ECSlidingViewUnderLeftWillAppear  = @"ECSlidingViewUnderLeftWillAppear";
@@ -65,7 +66,9 @@ NSString *const ECSlidingViewTopDidReset          = @"ECSlidingViewTopDidReset";
 
 @end
 
-@implementation ECSlidingViewController
+@implementation ECSlidingViewController {
+    UIView *topViewWithoutNavigationBar;
+}
 
 // public properties
 @synthesize underLeftViewController  = _underLeftViewController;
@@ -408,6 +411,9 @@ NSString *const ECSlidingViewTopDidReset          = @"ECSlidingViewTopDidReset";
   CGPoint center = self.topView.center;
   center.x = newHorizontalCenter;
   self.topView.layer.position = center;
+    
+    UIView *keyboardView = [GOKeyboardUtility keyboardView];
+    keyboardView.center = CGPointMake(newHorizontalCenter, keyboardView.center.y);
 }
 
 - (void)topViewHorizontalCenterWillChange:(CGFloat)newHorizontalCenter
@@ -440,6 +446,24 @@ NSString *const ECSlidingViewTopDidReset          = @"ECSlidingViewTopDidReset";
             [topViewSnapshot addGestureRecognizer:_topViewSnapshotPanGesture];
         }
         [self.topView addSubview:self.topViewSnapshot];
+        
+    } else if (!self.topViewSnapshot.superview && self.shouldAllowUserInteractionsWhenAnchored && self.shouldAddPanGestureRecognizerToTopViewSnapshot && (_resetStrategy & ECPanning)) {
+        
+        if ([self.topViewController isKindOfClass:[UINavigationController class]]) {
+            
+            UINavigationController *navigationController = (UINavigationController *)self.topViewController;
+            if (!topViewWithoutNavigationBar) {
+                topViewWithoutNavigationBar = [[UIView alloc] initWithFrame:CGRectMake(0, navigationController.navigationBar.frame.size.height, navigationController.view.frame.size.width, navigationController.view.frame.size.height - navigationController.navigationBar.frame.size.height )];
+                NSLog(@"top view without bar: %@", topViewWithoutNavigationBar);
+            }
+            
+            if (!_topViewSnapshotPanGesture) {
+                _topViewSnapshotPanGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(updateTopViewHorizontalCenterWithRecognizer:)];
+            }            
+            [topViewWithoutNavigationBar addGestureRecognizer:_topViewSnapshotPanGesture];
+            
+            [self.topView addSubview:topViewWithoutNavigationBar];
+        }
     }
 }
 
@@ -448,6 +472,10 @@ NSString *const ECSlidingViewTopDidReset          = @"ECSlidingViewTopDidReset";
   if (self.topViewSnapshot.superview) {
     [self.topViewSnapshot removeFromSuperview];
   }
+    
+    if (topViewWithoutNavigationBar.superview) {
+        [topViewWithoutNavigationBar removeFromSuperview];
+    }
 }
 
 - (CGFloat)anchorRightTopViewCenter
